@@ -635,6 +635,13 @@ public class AbstractStreamDecoderTest
             return null;
         }
 
+        @Nonnull
+        @Override
+        public Object getConsoleLock()
+        {
+            return new Object();
+        }
+
         @Override
         public File getEventStreamBinaryFile()
         {
