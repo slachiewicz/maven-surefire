@@ -25,9 +25,21 @@ on:
 
 jobs:
   build:
-    name: Verify
-    uses: apache/maven-gh-actions-shared/.github/workflows/maven-verify.yml@v1
-    with:
-      ff-goal: 'install'
-      verify-goal: 'install -P run-its'
-      verify-fail-fast: false
+    runs-on: ${{ inputs.ff-os }}
+    steps:
+    - name: Verify
+      uses: apache/maven-gh-actions-shared/.github/workflows/maven-verify.yml@v1
+      with:
+        ff-goal: 'clean install'
+        verify-goal: 'clean install -P run-its'
+        verify-fail-fast: false
+    - name: Upload artifact surefire-its
+      uses: actions/upload-artifact@v2-preview
+      if: failure()
+      with:
+        name: ${{ matrix.os }}-surefire-its
+        path: |
+          surefire-its/target/*/log.txt
+          surefire-its/target/**/surefire-reports/*
+          surefire-its/target/**/failsafe-reports/*
+          !surefire-its/target/failsafe-reports
