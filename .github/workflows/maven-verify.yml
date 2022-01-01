@@ -25,7 +25,15 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ inputs.ff-os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        java: [8, 11, 17]
+        jdk: [temurin, zulu]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     steps:
     - name: Verify
       uses: apache/maven-gh-actions-shared/.github/workflows/maven-verify.yml@v1
