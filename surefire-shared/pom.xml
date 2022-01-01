@@ -27,9 +27,11 @@
         <version>3.0.0-M6-SNAPSHOT</version>
     </parent>
 
-    <artifactId>surefire-shared-utils</artifactId>
+    <artifactId>surefire-shared</artifactId>
     <name>Surefire Shared Utils</name>
-    <description>Relocated Java packages of maven-shared-utils in Surefire</description>
+    <description>
+        Relocated Java packages of maven-shared-utils and several Apache Commons utilities in Surefire.
+    </description>
 
     <licenses>
         <license>
@@ -60,6 +62,34 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>bsh-property</id>
+                        <goals>
+                            <goal>bsh-property</goal>
+                        </goals>
+                        <configuration>
+                            <properties>
+                                <property>deploymentRepoId</property>
+                                <property>deploymentRepoUrl</property>
+                            </properties>
+                            <source>
+                                relUrl = project.getDistributionManagement().getRepository().getUrl();
+                                snapUrl = project.getDistributionManagement().getSnapshotRepository().getUrl();
+                                relId = project.getDistributionManagement().getRepository().getId();
+                                snapId = project.getDistributionManagement().getSnapshotRepository().getId();
+                                isSnapshot = project.getVersion().matches(".*-SNAPSHOT");
+                                deploymentRepoId = isSnapshot ? snapId : relId;
+                                deploymentRepoUrl = isSnapshot ? snapUrl : relUrl;
+                            </source>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-shade-plugin</artifactId>
                 <executions>
@@ -94,6 +124,42 @@
                                     <shadedPattern>org.apache.maven.surefire.shared.compress</shadedPattern>
                                 </relocation>
                             </relocations>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-install-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>install-jar</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <artifactId>surefire-shared-utils</artifactId>
+                            <file>target/${project.build.finalName}.jar</file>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>deploy-jar</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>deploy-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>${project.groupId}</groupId>
+                            <artifactId>surefire-shared-utils</artifactId>
+                            <version>${project.version}</version>
+                            <file>target/${project.build.finalName}.jar</file>
+                            <url>${deploymentRepoUrl}</url>
+                            <repositoryId>${deploymentRepoId}</repositoryId>
                         </configuration>
                     </execution>
                 </executions>
