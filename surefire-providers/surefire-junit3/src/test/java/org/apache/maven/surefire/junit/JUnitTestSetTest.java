@@ -22,14 +22,18 @@ package org.apache.maven.surefire.junit;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.apache.maven.surefire.api.testset.TestSetFailedException;
 import org.apache.maven.surefire.common.junit3.JUnit3Reflector;
 import org.apache.maven.surefire.api.report.ReportEntry;
 import org.apache.maven.surefire.api.report.RunListener;
 import org.apache.maven.surefire.api.report.RunMode;
 import org.apache.maven.surefire.api.report.TestSetReportEntry;
+import org.apache.maven.surefire.shared.lang3.JavaVersion;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.apache.maven.surefire.api.util.ReflectionUtils.invokeGetter;
 
 /**
  *
@@ -52,6 +56,32 @@ public class JUnitTestSetTest
                 succeededTests.get( 0 ).getSourceName() );
         assertEquals( "testSuccess",
                       succeededTests.get( 0 ).getName() );
+    }
+
+    public void testSystemManager()
+    {
+        float javaVersion = Float.parseFloat( JavaVersion.JAVA_RECENT.toString() );
+        boolean isDeprecated = javaVersion >= 17;
+        try
+        {
+            JUnit3Provider.setSystemManager( "java.lang.SecurityManager" );
+
+            if ( isDeprecated )
+            {
+                fail();
+            }
+
+            Object sm = invokeGetter( System.class, null, "getSecurityManager" );
+            assertNotNull( sm );
+            assertEquals( "java.lang.SecurityManager", sm.getClass().getName() );
+        }
+        catch ( TestSetFailedException e )
+        {
+            if ( !isDeprecated )
+            {
+                fail();
+            }
+        }
     }
 
     /**

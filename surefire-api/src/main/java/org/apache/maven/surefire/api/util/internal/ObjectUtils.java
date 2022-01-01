@@ -22,6 +22,8 @@ package org.apache.maven.surefire.api.util.internal;
 import java.lang.management.ManagementFactory;
 import java.util.Map;
 
+import static org.apache.maven.surefire.api.util.ReflectionUtils.tryLoadClass;
+
 /**
  * Similar to Java 7 java.util.Objects.
  *
@@ -43,5 +45,12 @@ public final class ObjectUtils
     public static Map<String, String> systemProps()
     {
         return ManagementFactory.getRuntimeMXBean().getSystemProperties();
+    }
+
+    public static boolean isSecurityManagerSupported()
+    {
+        ClassLoader classLoader = ObjectUtils.class.getClassLoader();
+        Class<?> smClass = tryLoadClass( classLoader, "java.lang.SecurityManager" );
+        return smClass != null && !smClass.isAnnotationPresent( Deprecated.class );
     }
 }
