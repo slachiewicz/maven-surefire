@@ -28,7 +28,7 @@
 
   <groupId>org.apache.maven.surefire</groupId>
   <artifactId>surefire</artifactId>
-  <version>3.6.2-SNAPSHOT</version>
+  <version>4.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>Apache Maven Surefire</name>
@@ -58,10 +58,12 @@
     <module>surefire-shadefire</module>
     <module>maven-surefire-common</module>
     <module>surefire-report-parser</module>
+    <!-- consumers of maven-surefire-common, still on the Maven 3 API: not ported yet
     <module>maven-surefire-plugin</module>
     <module>maven-failsafe-plugin</module>
+    -->
     <module>maven-surefire-report-plugin</module>
-    <module>surefire-its</module>
+    <!-- <module>surefire-its</module> -->
   </modules>
 
   <scm>
@@ -304,6 +306,10 @@
               <exclude>src/main/resources/META-INF/services/org.apache.maven.surefire.api.provider.SurefireProvider</exclude>
               <exclude>src/main/resources/META-INF/services/org.apache.maven.surefire.extensions.ForkedProcessTimeoutExtension</exclude>
               <exclude>DEPENDENCIES</exclude>
+              <!-- not in the reactor until they are ported: their test resources are not excluded by their own build -->
+              <exclude>maven-surefire-plugin/**</exclude>
+              <exclude>maven-failsafe-plugin/**</exclude>
+              <exclude>surefire-its/**</exclude>
               <exclude>.m2/**</exclude>
               <exclude>.m2</exclude>
               <exclude>.travis.yml</exclude>

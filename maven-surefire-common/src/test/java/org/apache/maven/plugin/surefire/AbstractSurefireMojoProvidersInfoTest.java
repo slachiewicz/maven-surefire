@@ -18,8 +18,7 @@
  */
 package org.apache.maven.plugin.surefire;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.DefaultArtifact;
+import org.apache.maven.api.Artifact;
 import org.apache.maven.surefire.providerapi.ProviderInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,9 +49,7 @@ public class AbstractSurefireMojoProvidersInfoTest {
     @Test
     public void jUnitPlatformProviderApplicable() {
         Artifact junitPlatform = mock(Artifact.class);
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, junitPlatform, aTestClassPath(), null, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, junitPlatform, null);
 
         assertThat(providerInfo.isApplicable()).isTrue();
 
@@ -62,9 +59,7 @@ public class AbstractSurefireMojoProvidersInfoTest {
 
     @Test
     public void jUnitPlatformProviderNotApplicable() {
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), null, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, null);
         assertThat(providerInfo.isApplicable()).isFalse();
     }
 
@@ -72,20 +67,7 @@ public class AbstractSurefireMojoProvidersInfoTest {
     public void jUnitPlatformProviderNotApplicableForPlatformRunner() {
         // not applicable if junit-platform-runner is on classpath
         Artifact junitPlatformRunnerArtifact = mock(Artifact.class);
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                junitPlatformRunnerArtifact,
-                null,
-                aTestClassPath(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+        ProviderInfo providerInfo = platformInfo(junitPlatformRunnerArtifact, null, null);
         assertThat(providerInfo.isApplicable()).isFalse();
 
         // no interaction with artifact only reference are checked
@@ -96,64 +78,67 @@ public class AbstractSurefireMojoProvidersInfoTest {
 
     @Test
     public void jUnit4ProviderNullArtifacts() {
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), null, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, null);
         assertThat(providerInfo.isApplicable()).isFalse();
     }
 
     @Test
     public void jUnit4ProviderJunit3AsDependencyArtifact() {
         Artifact junit = aArtifact("3.8.1");
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), junit, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, junit);
         assertThat(providerInfo.isApplicable()).isFalse();
     }
 
     @Test
     public void jUnit4ProviderJunit45AsDependencyArtifact() {
         Artifact junit = aArtifact("4.5");
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), junit, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, junit);
         assertThat(providerInfo.isApplicable()).isFalse();
     }
 
     @Test
     public void jUnit4ProviderJunit47AsDependencyArtifact() {
         Artifact junit = aArtifact("4.7");
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), junit, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, junit);
         assertThat(providerInfo.isApplicable()).isFalse();
     }
 
     @Test
     public void jUnit4ProviderJunit411AsDependencyArtifact() {
         Artifact junit = aArtifact("4.11");
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), junit, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, junit);
         assertThat(providerInfo.isApplicable()).isFalse();
     }
 
     @Test
     public void jUnit4ProviderJunit412AsDependencyArtifact() {
         Artifact junit = aArtifact("4.12");
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), junit, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, junit);
         assertThat(providerInfo.isApplicable()).isTrue();
     }
 
     @Test
     public void jUnit4ProviderJunit413AsDependencyArtifact() {
         Artifact junit = aArtifact("4.13");
-        ProviderInfo providerInfo = mojo
-        .new JUnitPlatformProviderInfo(
-                null, null, aTestClassPath(), junit, null, null, null, null, null, null, null, null);
+        ProviderInfo providerInfo = platformInfo(null, null, junit);
         assertThat(providerInfo.isApplicable()).isTrue();
+    }
+
+    private ProviderInfo platformInfo(Artifact runner, Artifact platform, Artifact junit) {
+        return mojo
+        .new JUnitPlatformProviderInfo(
+                runner,
+                platform,
+                aTestClassPath(),
+                junit,
+                null,
+                null,
+                TestSessions.session(),
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     private TestClassPath aTestClassPath() {
@@ -161,6 +146,6 @@ public class AbstractSurefireMojoProvidersInfoTest {
     }
 
     private Artifact aArtifact(String version) {
-        return new DefaultArtifact("test", "test", version, "test", "jar", "", null);
+        return TestSessions.artifact("test", "test", version);
     }
 }

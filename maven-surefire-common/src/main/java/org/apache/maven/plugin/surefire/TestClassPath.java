@@ -19,12 +19,13 @@
 package org.apache.maven.plugin.surefire;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.maven.artifact.Artifact;
+import org.apache.maven.api.DownloadedDependency;
 import org.apache.maven.surefire.booter.Classpath;
 
 import static java.util.Collections.addAll;
@@ -35,13 +36,13 @@ import static org.apache.maven.surefire.shared.lang3.StringUtils.split;
  * There is mot guarantee about backward compatibility.
  */
 public final class TestClassPath {
-    private final Iterable<Artifact> artifacts;
+    private final Iterable<DownloadedDependency> artifacts;
     private final File classesDirectory;
     private final File testClassesDirectory;
     private final Iterable<String> additionalClasspathElements;
 
     TestClassPath(
-            Iterable<Artifact> artifacts,
+            Iterable<DownloadedDependency> artifacts,
             File classesDirectory,
             File testClassesDirectory,
             Iterable<String> additionalClasspathElements) {
@@ -51,9 +52,9 @@ public final class TestClassPath {
         this.additionalClasspathElements = additionalClasspathElements;
     }
 
-    Map<String, Artifact> getTestDependencies() {
-        Map<String, Artifact> artifactMapping = new LinkedHashMap<>();
-        for (Artifact artifact : artifacts) {
+    Map<String, DownloadedDependency> getTestDependencies() {
+        Map<String, DownloadedDependency> artifactMapping = new LinkedHashMap<>();
+        for (DownloadedDependency artifact : artifacts) {
             artifactMapping.put(artifact.getGroupId() + ":" + artifact.getArtifactId(), artifact);
         }
         return artifactMapping;
@@ -63,11 +64,12 @@ public final class TestClassPath {
         List<String> classpath = new ArrayList<>();
         classpath.add(testClassesDirectory.getAbsolutePath());
         classpath.add(classesDirectory.getAbsolutePath());
-        for (Artifact artifact : artifacts) {
-            if (artifact.getArtifactHandler().isAddedToClasspath()) {
-                File file = artifact.getFile();
+        for (DownloadedDependency artifact : artifacts) {
+            // the counterpart of ArtifactHandler#isAddedToClasspath: types such as pom or zip have no path type
+            if (!artifact.getType().getPathTypes().isEmpty()) {
+                Path file = artifact.getPath();
                 if (file != null) {
-                    classpath.add(file.getAbsolutePath());
+                    classpath.add(file.toAbsolutePath().toString());
                 }
             }
         }
@@ -82,7 +84,7 @@ public final class TestClassPath {
         return new Classpath(classpath);
     }
 
-    public Iterable<Artifact> getArtifacts() {
+    public Iterable<DownloadedDependency> getArtifacts() {
         return artifacts;
     }
 

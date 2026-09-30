@@ -23,8 +23,10 @@ import javax.annotation.Nonnull;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.Artifact;
+import org.apache.maven.api.DownloadedArtifact;
+import org.apache.maven.api.Session;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugin.surefire.SurefireDependencyResolver;
 import org.apache.maven.plugin.surefire.TestClassPath;
 
@@ -42,9 +44,9 @@ public interface ProviderInfo {
     boolean isApplicable();
 
     @Nonnull
-    Set<Artifact> getProviderClasspath() throws MojoExecutionException;
+    Set<DownloadedArtifact> getProviderClasspath() throws MojoException;
 
-    void addProviderProperties() throws MojoExecutionException;
+    void addProviderProperties() throws MojoException;
 
     @Nonnull
     List<String[]> getJpmsArguments(@Nonnull ProviderRequirements forkRequirements);
@@ -54,11 +56,11 @@ public interface ProviderInfo {
      * {@link SurefireDependencyResolver#MINIMUM_JUNIT4_VERSION_SPEC} is not supported, so this is false
      * for those and for a missing artifact.
      */
-    default boolean isAnyJunit4(Artifact artifact) {
-        return isWithinVersionSpec(artifact, MINIMUM_JUNIT4_VERSION_SPEC);
+    default boolean isAnyJunit4(Session session, Artifact artifact) {
+        return isWithinVersionSpec(session, artifact, MINIMUM_JUNIT4_VERSION_SPEC);
     }
 
-    default TestClassPath decorateTestClassPath(TestClassPath testClasspath) throws MojoExecutionException {
+    default TestClassPath decorateTestClassPath(TestClassPath testClasspath) throws MojoException {
         // no op
         return testClasspath;
     }

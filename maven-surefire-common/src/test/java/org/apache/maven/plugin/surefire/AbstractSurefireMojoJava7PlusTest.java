@@ -20,16 +20,16 @@ package org.apache.maven.plugin.surefire;
 
 import java.io.File;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.DefaultArtifact;
-import org.apache.maven.artifact.handler.ArtifactHandler;
-import org.apache.maven.artifact.versioning.VersionRange;
+import org.apache.maven.api.Artifact;
+import org.apache.maven.api.DependencyScope;
+import org.apache.maven.api.DownloadedArtifact;
 import org.apache.maven.plugin.surefire.log.PluginConsoleLogger;
 import org.apache.maven.surefire.api.suite.RunResult;
 import org.apache.maven.surefire.api.util.DefaultScanResult;
@@ -60,7 +60,6 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
-import static org.apache.maven.artifact.versioning.VersionRange.createFromVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Index.atIndex;
 import static org.mockito.ArgumentMatchers.any;
@@ -84,9 +83,6 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class AbstractSurefireMojoJava7PlusTest {
     @Mock
-    private ArtifactHandler handler;
-
-    @Mock
     private LocationManager locationManager;
 
     @Mock
@@ -96,25 +92,25 @@ public class AbstractSurefireMojoJava7PlusTest {
     @SuppressWarnings("checkstyle:linelength")
     public void shouldHaveStartupConfigForModularClasspath() throws Exception {
         Mojo mojo = spy(new Mojo());
+        mojo.setSession(TestSessions.delegatingSession());
         setInternalState(mojo, "locationManager", locationManager);
 
-        when(handler.isAddedToClasspath()).thenReturn(true);
+        String v1 = "1";
+        StubDependency modular = new StubDependency("x", "modular", v1, "jar", DependencyScope.forId("compile"));
+        modular.setPath(pathOf(mockFile("modular.jar")));
 
-        VersionRange v1 = createFromVersion("1");
-        Artifact modular = new DefaultArtifact("x", "modular", v1, "compile", "jar", "", handler);
-        modular.setFile(mockFile("modular.jar"));
+        String v2 = "1";
+        StubDependency nonModular = new StubDependency("x", "non-modular", v2, "jar", DependencyScope.forId("test"));
+        nonModular.setPath(pathOf(mockFile("non-modular.jar")));
 
-        VersionRange v2 = createFromVersion("1");
-        Artifact nonModular = new DefaultArtifact("x", "non-modular", v2, "test", "jar", "", handler);
-        nonModular.setFile(mockFile("non-modular.jar"));
+        String v3 = "4.12";
+        StubDependency junit = new StubDependency("junit", "junit", v3, "jar", DependencyScope.forId("test"));
+        junit.setPath(pathOf(mockFile("junit.jar")));
 
-        VersionRange v3 = createFromVersion("4.12");
-        Artifact junit = new DefaultArtifact("junit", "junit", v3, "test", "jar", "", handler);
-        junit.setFile(mockFile("junit.jar"));
-
-        VersionRange v4 = createFromVersion("1.3.0");
-        Artifact hamcrest = new DefaultArtifact("org.hamcrest", "hamcrest-core", v4, "test", "jar", "", handler);
-        hamcrest.setFile(mockFile("hamcrest.jar"));
+        String v4 = "1.3.0";
+        StubDependency hamcrest =
+                new StubDependency("org.hamcrest", "hamcrest-core", v4, "jar", DependencyScope.forId("test"));
+        hamcrest.setPath(pathOf(mockFile("hamcrest.jar")));
 
         File classesDir = mockFile("classes");
         File testClassesDir = mockFile("test-classes");
@@ -132,11 +128,11 @@ public class AbstractSurefireMojoJava7PlusTest {
 
         ClassLoaderConfiguration classLoaderConfiguration = new ClassLoaderConfiguration(false, true);
 
-        VersionRange v5 = createFromVersion("1");
-        Artifact providerArtifact = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-provider", v5, "runtime", "jar", "", handler);
-        providerArtifact.setFile(mockFile("surefire-provider.jar"));
-        Set<Artifact> providerClasspath = singleton(providerArtifact);
+        String v5 = "1";
+        StubDependency providerArtifact = new StubDependency(
+                "org.apache.maven.surefire", "surefire-provider", v5, "jar", DependencyScope.forId("runtime"));
+        providerArtifact.setPath(pathOf(mockFile("surefire-provider.jar")));
+        Set<DownloadedArtifact> providerClasspath = singleton(providerArtifact);
 
         ResolvePathResult moduleInfo = mock(ResolvePathResult.class);
         when(moduleInfo.getModuleDescriptor()).thenReturn(descriptor);
@@ -174,45 +170,33 @@ public class AbstractSurefireMojoJava7PlusTest {
         doNothing().when(logger).debug(anyString());
         when(mojo.getConsoleLogger()).thenReturn(new PluginConsoleLogger(logger));
 
-        Artifact common = new DefaultArtifact(
-                "org.apache.maven.surefire", "maven-surefire-common", v5, "runtime", "jar", "", handler);
-        common.setFile(mockFile("maven-surefire-common.jar"));
+        StubDependency common = new StubDependency(
+                "org.apache.maven.surefire", "maven-surefire-common", v5, "jar", DependencyScope.forId("runtime"));
+        common.setPath(pathOf(mockFile("maven-surefire-common.jar")));
 
-        Artifact ext = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-extensions-api", v5, "runtime", "jar", "", handler);
-        ext.setFile(mockFile("surefire-extensions-api.jar"));
+        StubDependency ext = new StubDependency(
+                "org.apache.maven.surefire", "surefire-extensions-api", v5, "jar", DependencyScope.forId("runtime"));
+        ext.setPath(pathOf(mockFile("surefire-extensions-api.jar")));
 
-        Artifact api =
-                new DefaultArtifact("org.apache.maven.surefire", "surefire-api", v5, "runtime", "jar", "", handler);
-        api.setFile(mockFile("surefire-api.jar"));
+        StubDependency api = new StubDependency(
+                "org.apache.maven.surefire", "surefire-api", v5, "jar", DependencyScope.forId("runtime"));
+        api.setPath(pathOf(mockFile("surefire-api.jar")));
 
-        Artifact loggerApi = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-logger-api", v5, "runtime", "jar", "", handler);
-        loggerApi.setFile(mockFile("surefire-logger-api.jar"));
+        StubDependency loggerApi = new StubDependency(
+                "org.apache.maven.surefire", "surefire-logger-api", v5, "jar", DependencyScope.forId("runtime"));
+        loggerApi.setPath(pathOf(mockFile("surefire-logger-api.jar")));
 
-        Artifact spi = new DefaultArtifact(
-                "org.apache.maven.surefire",
-                "surefire-extensions-spi",
-                createFromVersion("1"),
-                "runtime",
-                "jar",
-                "",
-                handler);
-        spi.setFile(mockFile("surefire-extensions-spi.jar"));
+        StubDependency spi = new StubDependency(
+                "org.apache.maven.surefire", "surefire-extensions-spi", "1", "jar", DependencyScope.forId("runtime"));
+        spi.setPath(pathOf(mockFile("surefire-extensions-spi.jar")));
 
-        Artifact booter = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-booter", createFromVersion("1"), "runtime", "jar", "", handler);
-        booter.setFile(mockFile("surefire-booter.jar"));
+        StubDependency booter = new StubDependency(
+                "org.apache.maven.surefire", "surefire-booter", "1", "jar", DependencyScope.forId("runtime"));
+        booter.setPath(pathOf(mockFile("surefire-booter.jar")));
 
-        Artifact utils = new DefaultArtifact(
-                "org.apache.maven.surefire",
-                "surefire-shared-utils",
-                createFromVersion("1"),
-                "runtime",
-                "jar",
-                "",
-                handler);
-        utils.setFile(mockFile("surefire-shared-utils.jar"));
+        StubDependency utils = new StubDependency(
+                "org.apache.maven.surefire", "surefire-shared-utils", "1", "jar", DependencyScope.forId("runtime"));
+        utils.setPath(pathOf(mockFile("surefire-shared-utils.jar")));
 
         Map<String, Artifact> artifacts = new HashMap<>();
         artifacts.put("org.apache.maven.surefire:maven-surefire-common", common);
@@ -222,7 +206,7 @@ public class AbstractSurefireMojoJava7PlusTest {
         artifacts.put("org.apache.maven.surefire:surefire-extensions-spi", spi);
         artifacts.put("org.apache.maven.surefire:surefire-booter", booter);
         artifacts.put("org.apache.maven.surefire:surefire-shared-utils", utils);
-        when(mojo.getPluginArtifactMap()).thenReturn(artifacts);
+        doReturn(artifacts).when(mojo).getPluginArtifactMap();
 
         ProviderInfo providerInfo = mock(ProviderInfo.class);
         when(providerInfo.getProviderName()).thenReturn("org.asf.Provider");
@@ -298,25 +282,25 @@ public class AbstractSurefireMojoJava7PlusTest {
     @SuppressWarnings("checkstyle:linelength")
     public void shouldHaveStartupConfigForModularClasspathAndTestDescriptor() throws Exception {
         Mojo mojo = spy(new Mojo());
+        mojo.setSession(TestSessions.delegatingSession());
         setInternalState(mojo, "locationManager", locationManager);
 
-        when(handler.isAddedToClasspath()).thenReturn(true);
+        String v1 = "1";
+        StubDependency modular = new StubDependency("x", "modular", v1, "jar", DependencyScope.forId("compile"));
+        modular.setPath(pathOf(mockFile("modular.jar")));
 
-        VersionRange v1 = createFromVersion("1");
-        Artifact modular = new DefaultArtifact("x", "modular", v1, "compile", "jar", "", handler);
-        modular.setFile(mockFile("modular.jar"));
+        String v2 = "1";
+        StubDependency nonModular = new StubDependency("x", "non-modular", v2, "jar", DependencyScope.forId("test"));
+        nonModular.setPath(pathOf(mockFile("non-modular.jar")));
 
-        VersionRange v2 = createFromVersion("1");
-        Artifact nonModular = new DefaultArtifact("x", "non-modular", v2, "test", "jar", "", handler);
-        nonModular.setFile(mockFile("non-modular.jar"));
+        String v3 = "4.12";
+        StubDependency junit = new StubDependency("junit", "junit", v3, "jar", DependencyScope.forId("test"));
+        junit.setPath(pathOf(mockFile("junit.jar")));
 
-        VersionRange v3 = createFromVersion("4.12");
-        Artifact junit = new DefaultArtifact("junit", "junit", v3, "test", "jar", "", handler);
-        junit.setFile(mockFile("junit.jar"));
-
-        VersionRange v4 = createFromVersion("1.3.0");
-        Artifact hamcrest = new DefaultArtifact("org.hamcrest", "hamcrest-core", v4, "test", "jar", "", handler);
-        hamcrest.setFile(mockFile("hamcrest.jar"));
+        String v4 = "1.3.0";
+        StubDependency hamcrest =
+                new StubDependency("org.hamcrest", "hamcrest-core", v4, "jar", DependencyScope.forId("test"));
+        hamcrest.setPath(pathOf(mockFile("hamcrest.jar")));
 
         File classesDir = mockFile("classes");
         File testClassesDir = mockFile("test-classes");
@@ -334,11 +318,11 @@ public class AbstractSurefireMojoJava7PlusTest {
 
         ClassLoaderConfiguration classLoaderConfiguration = new ClassLoaderConfiguration(false, true);
 
-        VersionRange v5 = createFromVersion("1");
-        Artifact providerArtifact = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-provider", v5, "runtime", "jar", "", handler);
-        providerArtifact.setFile(mockFile("surefire-provider.jar"));
-        Set<Artifact> providerClasspath = singleton(providerArtifact);
+        String v5 = "1";
+        StubDependency providerArtifact = new StubDependency(
+                "org.apache.maven.surefire", "surefire-provider", v5, "jar", DependencyScope.forId("runtime"));
+        providerArtifact.setPath(pathOf(mockFile("surefire-provider.jar")));
+        Set<DownloadedArtifact> providerClasspath = singleton(providerArtifact);
 
         ResolvePathResult moduleInfo = mock(ResolvePathResult.class);
         when(moduleInfo.getModuleDescriptor()).thenReturn(descriptor);
@@ -350,45 +334,33 @@ public class AbstractSurefireMojoJava7PlusTest {
         doNothing().when(logger).debug(anyString());
         when(mojo.getConsoleLogger()).thenReturn(new PluginConsoleLogger(logger));
 
-        Artifact common = new DefaultArtifact(
-                "org.apache.maven.surefire", "maven-surefire-common", v5, "runtime", "jar", "", handler);
-        common.setFile(mockFile("maven-surefire-common.jar"));
+        StubDependency common = new StubDependency(
+                "org.apache.maven.surefire", "maven-surefire-common", v5, "jar", DependencyScope.forId("runtime"));
+        common.setPath(pathOf(mockFile("maven-surefire-common.jar")));
 
-        Artifact ext = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-extensions-api", v5, "runtime", "jar", "", handler);
-        ext.setFile(mockFile("surefire-extensions-api.jar"));
+        StubDependency ext = new StubDependency(
+                "org.apache.maven.surefire", "surefire-extensions-api", v5, "jar", DependencyScope.forId("runtime"));
+        ext.setPath(pathOf(mockFile("surefire-extensions-api.jar")));
 
-        Artifact api =
-                new DefaultArtifact("org.apache.maven.surefire", "surefire-api", v5, "runtime", "jar", "", handler);
-        api.setFile(mockFile("surefire-api.jar"));
+        StubDependency api = new StubDependency(
+                "org.apache.maven.surefire", "surefire-api", v5, "jar", DependencyScope.forId("runtime"));
+        api.setPath(pathOf(mockFile("surefire-api.jar")));
 
-        Artifact loggerApi = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-logger-api", v5, "runtime", "jar", "", handler);
-        loggerApi.setFile(mockFile("surefire-logger-api.jar"));
+        StubDependency loggerApi = new StubDependency(
+                "org.apache.maven.surefire", "surefire-logger-api", v5, "jar", DependencyScope.forId("runtime"));
+        loggerApi.setPath(pathOf(mockFile("surefire-logger-api.jar")));
 
-        Artifact spi = new DefaultArtifact(
-                "org.apache.maven.surefire",
-                "surefire-extensions-spi",
-                createFromVersion("1"),
-                "runtime",
-                "jar",
-                "",
-                handler);
-        spi.setFile(mockFile("surefire-extensions-spi.jar"));
+        StubDependency spi = new StubDependency(
+                "org.apache.maven.surefire", "surefire-extensions-spi", "1", "jar", DependencyScope.forId("runtime"));
+        spi.setPath(pathOf(mockFile("surefire-extensions-spi.jar")));
 
-        Artifact booter = new DefaultArtifact(
-                "org.apache.maven.surefire", "surefire-booter", createFromVersion("1"), "runtime", "jar", "", handler);
-        booter.setFile(mockFile("surefire-booter.jar"));
+        StubDependency booter = new StubDependency(
+                "org.apache.maven.surefire", "surefire-booter", "1", "jar", DependencyScope.forId("runtime"));
+        booter.setPath(pathOf(mockFile("surefire-booter.jar")));
 
-        Artifact utils = new DefaultArtifact(
-                "org.apache.maven.surefire",
-                "surefire-shared-utils",
-                createFromVersion("1"),
-                "runtime",
-                "jar",
-                "",
-                handler);
-        utils.setFile(mockFile("surefire-shared-utils.jar"));
+        StubDependency utils = new StubDependency(
+                "org.apache.maven.surefire", "surefire-shared-utils", "1", "jar", DependencyScope.forId("runtime"));
+        utils.setPath(pathOf(mockFile("surefire-shared-utils.jar")));
 
         Map<String, Artifact> artifacts = new HashMap<>();
         artifacts.put("org.apache.maven.surefire:maven-surefire-common", common);
@@ -398,7 +370,7 @@ public class AbstractSurefireMojoJava7PlusTest {
         artifacts.put("org.apache.maven.surefire:surefire-extensions-spi", spi);
         artifacts.put("org.apache.maven.surefire:surefire-booter", booter);
         artifacts.put("org.apache.maven.surefire:surefire-shared-utils", utils);
-        when(mojo.getPluginArtifactMap()).thenReturn(artifacts);
+        doReturn(artifacts).when(mojo).getPluginArtifactMap();
 
         ProviderInfo providerInfo = mock(ProviderInfo.class);
         when(providerInfo.getProviderName()).thenReturn("org.asf.Provider");
@@ -500,6 +472,16 @@ public class AbstractSurefireMojoJava7PlusTest {
         result = invokeMethod(AbstractSurefireMojo.class, "join", methodArgTypes, args);
         assertThat(result).isNotNull();
         assertThat(result).isEmpty();
+    }
+
+    private static Path pathOf(File file) {
+        // the tests pass mocked files, which only know their absolute path
+        String absolutePath = file.getAbsolutePath();
+        Path path = mock(Path.class);
+        when(path.toAbsolutePath()).thenReturn(path);
+        when(path.toString()).thenReturn(absolutePath);
+        when(path.toFile()).thenReturn(file);
+        return path;
     }
 
     private static File mockFile(String absolutePath) {

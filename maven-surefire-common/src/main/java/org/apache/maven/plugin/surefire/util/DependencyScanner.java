@@ -29,8 +29,8 @@ import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.api.Dependency;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.shared.artifact.filter.PatternIncludesArtifactFilter;
 import org.apache.maven.surefire.api.testset.TestFilter;
 import org.apache.maven.surefire.api.testset.TestListResolver;
@@ -54,14 +54,14 @@ public class DependencyScanner {
         this.filter = filter;
     }
 
-    public DefaultScanResult scan() throws MojoExecutionException {
+    public DefaultScanResult scan() throws MojoException {
         Set<String> classes = new LinkedHashSet<>();
         for (File artifact : dependenciesToScan) {
             if (artifact != null && artifact.isFile() && artifact.getName().endsWith(".jar")) {
                 try {
                     scanArtifact(artifact, filter, classes);
                 } catch (IOException e) {
-                    throw new MojoExecutionException("Could not scan dependency " + artifact.toString(), e);
+                    throw new MojoException("Could not scan dependency " + artifact.toString(), e);
                 }
             }
         }
@@ -88,16 +88,16 @@ public class DependencyScanner {
      * @return list of items from <code>artifacts</code> that match any of the filters in <code>groupArtifactIds</code>,
      * empty if none match
      */
-    public static List<Artifact> filter(List<Artifact> artifacts, List<String> artifactPatterns) {
+    public static <T extends Dependency> List<T> filter(List<T> artifacts, List<String> artifactPatterns) {
         if (artifactPatterns == null || artifacts == null || artifacts.isEmpty()) {
             return Collections.emptyList();
         }
 
         PatternIncludesArtifactFilter artifactFilter = new PatternIncludesArtifactFilter(artifactPatterns);
 
-        List<Artifact> matches = new ArrayList<>();
-        for (Artifact artifact : artifacts) {
-            if (artifactFilter.include(artifact)) {
+        List<T> matches = new ArrayList<>();
+        for (T artifact : artifacts) {
+            if (artifactFilter.test(artifact)) {
                 matches.add(artifact);
             }
         }

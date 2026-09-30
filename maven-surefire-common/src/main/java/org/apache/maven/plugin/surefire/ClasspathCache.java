@@ -25,7 +25,7 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.maven.artifact.Artifact;
+import org.apache.maven.api.DownloadedArtifact;
 import org.apache.maven.surefire.booter.Classpath;
 
 /**
@@ -43,10 +43,10 @@ public class ClasspathCache {
         CLASSPATHS.put(key, classpath);
     }
 
-    public static Classpath setCachedClasspath(@Nonnull String key, @Nonnull Set<Artifact> artifacts) {
+    public static Classpath setCachedClasspath(@Nonnull String key, @Nonnull Set<DownloadedArtifact> artifacts) {
         Collection<String> files = new ArrayList<>();
-        for (Artifact artifact : artifacts) {
-            files.add(artifact.getFile().getAbsolutePath());
+        for (DownloadedArtifact artifact : artifacts) {
+            files.add(artifact.getPath().toAbsolutePath().toString());
         }
         Classpath classpath = new Classpath(files);
         setCachedClasspath(key, classpath);

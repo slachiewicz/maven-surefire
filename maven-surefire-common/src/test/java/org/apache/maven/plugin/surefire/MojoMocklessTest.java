@@ -27,12 +27,10 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.DefaultArtifact;
-import org.apache.maven.artifact.handler.ArtifactHandler;
-import org.apache.maven.artifact.handler.DefaultArtifactHandler;
-import org.apache.maven.artifact.versioning.VersionRange;
-import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.api.Artifact;
+import org.apache.maven.api.DependencyScope;
+import org.apache.maven.api.DownloadedDependency;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugin.surefire.extensions.SurefireConsoleOutputReporter;
 import org.apache.maven.plugin.surefire.extensions.SurefireStatelessReporter;
 import org.apache.maven.plugin.surefire.extensions.SurefireStatelessTestsetInfoReporter;
@@ -187,18 +185,16 @@ public class MojoMocklessTest {
     }
 
     @Test
-    public void scanDependenciesShouldReturnNull() throws MojoFailureException {
+    public void scanDependenciesShouldReturnNull() throws MojoException {
         Mojo mojo = new Mojo(null, null);
         DefaultScanResult result = mojo.scanDependencies();
         assertThat(result).isNull();
     }
 
     @Test
-    public void scanDependenciesShouldReturnNullAfterMissingBuildArtifact() throws MojoFailureException {
-        VersionRange version = VersionRange.createFromVersion("1.0");
-        ArtifactHandler handler = new DefaultArtifactHandler();
-        Artifact testDeps = new DefaultArtifact("g", "a", version, "compile", "jar", null, handler);
-        List<Artifact> projectTestArtifacts = singletonList(testDeps);
+    public void scanDependenciesShouldReturnNullAfterMissingBuildArtifact() throws MojoException {
+        DependencyBuilder testDeps = dependency("a", "compile", "jar");
+        List<DownloadedDependency> projectTestArtifacts = singletonList(testDeps.build());
         String[] dependenciesToScan = {"g:a"};
         Mojo mojo = new Mojo(projectTestArtifacts, dependenciesToScan);
         DefaultScanResult result = mojo.scanDependencies();
@@ -206,12 +202,10 @@ public class MojoMocklessTest {
     }
 
     @Test
-    public void scanDependenciesShouldReturnNullWithWAR() throws MojoFailureException {
-        VersionRange version = VersionRange.createFromVersion("1.0");
-        ArtifactHandler handler = new DefaultArtifactHandler();
-        Artifact testDeps = new DefaultArtifact("g", "a", version, "compile", "war", null, handler);
+    public void scanDependenciesShouldReturnNullWithWAR() throws MojoException {
+        DependencyBuilder testDeps = dependency("a", "compile", "war");
         testDeps.setFile(new File(new File("target"), "a-1.0.war"));
-        List<Artifact> projectTestArtifacts = singletonList(testDeps);
+        List<DownloadedDependency> projectTestArtifacts = singletonList(testDeps.build());
         String[] dependenciesToScan = {"g:a"};
         Mojo mojo = new Mojo(projectTestArtifacts, dependenciesToScan);
         DefaultScanResult result = mojo.scanDependencies();
@@ -220,12 +214,10 @@ public class MojoMocklessTest {
 
     @Test
     public void scanDependenciesShouldReturnNullWithExistingWAR() throws Exception {
-        VersionRange version = VersionRange.createFromVersion("1.0");
-        ArtifactHandler handler = new DefaultArtifactHandler();
-        Artifact testDeps = new DefaultArtifact("g", "a", version, "compile", "war", null, handler);
+        DependencyBuilder testDeps = dependency("a", "compile", "war");
         File artifactFile = Files.createTempFile(tempFolder, "surefire", ".war").toFile();
         testDeps.setFile(artifactFile);
-        List<Artifact> projectTestArtifacts = singletonList(testDeps);
+        List<DownloadedDependency> projectTestArtifacts = singletonList(testDeps.build());
         String[] dependenciesToScan = {"g:a"};
         Mojo mojo = new Mojo(projectTestArtifacts, dependenciesToScan);
         DefaultScanResult result = mojo.scanDependencies();
@@ -234,9 +226,7 @@ public class MojoMocklessTest {
 
     @Test
     public void scanDependenciesShouldReturnClassWithExistingTestJAR() throws Exception {
-        VersionRange version = VersionRange.createFromVersion("1.0");
-        ArtifactHandler handler = new DefaultArtifactHandler();
-        Artifact testDeps = new DefaultArtifact("g", "a", version, "compile", "test-jar", null, handler);
+        DependencyBuilder testDeps = dependency("a", "compile", "test-jar");
 
         File artifactFile = Files.createTempFile(tempFolder, "surefire", ".jar").toFile();
         testDeps.setFile(artifactFile);
@@ -248,7 +238,7 @@ public class MojoMocklessTest {
             os.finish();
         }
 
-        List<Artifact> projectTestArtifacts = singletonList(testDeps);
+        List<DownloadedDependency> projectTestArtifacts = singletonList(testDeps.build());
         String[] dependenciesToScan = {"g:a"};
         Mojo mojo = new Mojo(projectTestArtifacts, dependenciesToScan);
         mojo.setLogger(mock(Logger.class));
@@ -263,9 +253,7 @@ public class MojoMocklessTest {
 
     @Test
     public void scanDependenciesShouldReturnNullWithEmptyTestJAR() throws Exception {
-        VersionRange version = VersionRange.createFromVersion("1.0");
-        ArtifactHandler handler = new DefaultArtifactHandler();
-        Artifact testDeps = new DefaultArtifact("g", "a", version, "compile", "jar", null, handler);
+        DependencyBuilder testDeps = dependency("a", "compile", "jar");
 
         File artifactFile = Files.createTempFile(tempFolder, "surefire", ".jar").toFile();
         testDeps.setFile(artifactFile);
@@ -275,7 +263,7 @@ public class MojoMocklessTest {
             os.finish();
         }
 
-        List<Artifact> projectTestArtifacts = singletonList(testDeps);
+        List<DownloadedDependency> projectTestArtifacts = singletonList(testDeps.build());
         String[] dependenciesToScan = {"g:a"};
         Mojo mojo = new Mojo(projectTestArtifacts, dependenciesToScan);
         mojo.setLogger(mock(Logger.class));
@@ -288,9 +276,7 @@ public class MojoMocklessTest {
 
     @Test
     public void scanDependenciesShouldReturnClassWithDirectory() throws Exception {
-        VersionRange version = VersionRange.createFromVersion("1.0");
-        ArtifactHandler handler = new DefaultArtifactHandler();
-        Artifact testDeps = new DefaultArtifact("g", "a", version, "compile", "test-jar", null, handler);
+        DependencyBuilder testDeps = dependency("a", "compile", "test-jar");
 
         File classes = Files.createTempDirectory(tempFolder, "surefire-classes").toFile();
 
@@ -298,7 +284,7 @@ public class MojoMocklessTest {
 
         assertThat(new File(classes, "AnotherTest.class").createNewFile()).isTrue();
 
-        List<Artifact> projectTestArtifacts = singletonList(testDeps);
+        List<DownloadedDependency> projectTestArtifacts = singletonList(testDeps.build());
         String[] dependenciesToScan = {"g:a"};
         Mojo mojo = new Mojo(projectTestArtifacts, dependenciesToScan);
         mojo.setLogger(mock(Logger.class));
@@ -313,9 +299,7 @@ public class MojoMocklessTest {
 
     @Test
     public void scanMultipleDependencies() throws Exception {
-        VersionRange version = VersionRange.createFromVersion("1.0");
-        ArtifactHandler handler = new DefaultArtifactHandler();
-        Artifact testDep1 = new DefaultArtifact("g", "x", version, "compile", "jar", null, handler);
+        DependencyBuilder testDep1 = dependency("x", "compile", "jar");
 
         File classes = Files.createTempDirectory(tempFolder, "surefire-classes").toFile();
 
@@ -323,7 +307,7 @@ public class MojoMocklessTest {
 
         assertThat(new File(classes, "AnotherTest.class").createNewFile()).isTrue();
 
-        Artifact testDep2 = new DefaultArtifact("g", "a", version, "test", "jar", null, handler);
+        DependencyBuilder testDep2 = dependency("a", "test", "jar");
         File artifactFile2 =
                 Files.createTempFile(tempFolder, "surefire", ".jar").toFile();
         testDep2.setFile(artifactFile2);
@@ -335,7 +319,7 @@ public class MojoMocklessTest {
             os.finish();
         }
 
-        List<Artifact> projectTestArtifacts = asList(testDep1, testDep2);
+        List<DownloadedDependency> projectTestArtifacts = asList(testDep1.build(), testDep2.build());
         String[] dependenciesToScan = {"g:a"};
         Mojo mojo = new Mojo(projectTestArtifacts, dependenciesToScan);
         mojo.setLogger(mock(Logger.class));
@@ -350,11 +334,41 @@ public class MojoMocklessTest {
         assertThat(result.getClasses()).contains("pkg.MyTest");
     }
 
+    private static DependencyBuilder dependency(String artifactId, String scope, String type) {
+        return new DependencyBuilder(artifactId, scope, type);
+    }
+
+    /**
+     * The file of a dependency is known after the dependency is made.
+     */
+    private static final class DependencyBuilder {
+        private final String artifactId;
+        private final String scope;
+        private final String type;
+        private File file;
+
+        DependencyBuilder(String artifactId, String scope, String type) {
+            this.artifactId = artifactId;
+            this.scope = scope;
+            this.type = type;
+        }
+
+        void setFile(File file) {
+            this.file = file;
+        }
+
+        DownloadedDependency build() {
+            return new ResolvedDependency(
+                    new StubDependency("g", artifactId, "1.0", type, DependencyScope.forId(scope)),
+                    file == null ? null : file.toPath());
+        }
+    }
+
     private static final class Mojo extends AbstractSurefireMojo {
-        private final List<Artifact> projectTestArtifacts;
+        private final List<DownloadedDependency> projectTestArtifacts;
         private final String[] dependenciesToScan;
 
-        Mojo(List<Artifact> projectTestArtifacts, String[] dependenciesToScan) {
+        Mojo(List<DownloadedDependency> projectTestArtifacts, String[] dependenciesToScan) {
             this.projectTestArtifacts = projectTestArtifacts;
             this.dependenciesToScan = dependenciesToScan;
         }
@@ -646,7 +660,7 @@ public class MojoMocklessTest {
         }
 
         @Override
-        List<Artifact> getProjectTestArtifacts() {
+        List<DownloadedDependency> getProjectTestArtifacts() {
             return projectTestArtifacts;
         }
 

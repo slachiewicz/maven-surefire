@@ -19,9 +19,6 @@
 package org.apache.maven.surefire.providerapi;
 
 import javax.annotation.Nonnull;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -29,6 +26,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.apache.maven.api.di.Inject;
+import org.apache.maven.api.di.Named;
+import org.apache.maven.api.di.Singleton;
 import org.apache.maven.surefire.api.provider.SurefireProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -25,13 +25,14 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.commons.io.FilenameUtils;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.toolchain.Toolchain;
-import org.apache.maven.toolchain.ToolchainManager;
-import org.apache.maven.toolchain.java.DefaultJavaToolChain;
+import org.apache.maven.api.JavaToolchain;
+import org.apache.maven.api.Session;
+import org.apache.maven.api.Toolchain;
+import org.apache.maven.api.plugin.MojoException;
+import org.apache.maven.api.services.ToolchainManager;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -87,7 +88,7 @@ public class AbstractSurefireMojoToolchainsTest {
     @Test
     @Disabled
     public void shouldThrowToolchain() throws Exception {
-        assertThrows(MojoFailureException.class, () -> invokeMethod(AbstractSurefireMojo.class, "getToolchain"));
+        assertThrows(MojoException.class, () -> invokeMethod(AbstractSurefireMojo.class, "getToolchain"));
     }
 
     // TODO Is this still required?
@@ -107,7 +108,7 @@ public class AbstractSurefireMojoToolchainsTest {
     @Test
     public void shouldChangeJavaHomeFromToolchain() throws Exception {
         AbstractSurefireMojoTest.Mojo mojo = new AbstractSurefireMojoTest.Mojo();
-        DefaultJavaToolChain toolchain = mock(DefaultJavaToolChain.class);
+        JavaToolchain toolchain = mock(JavaToolchain.class);
         when(toolchain.findTool("java")).thenReturn("/path/from/toolchain");
         when(toolchain.getJavaHome()).thenReturn("/some/path");
         mojo.setToolchain(toolchain);
@@ -124,7 +125,7 @@ public class AbstractSurefireMojoToolchainsTest {
         AbstractSurefireMojoTest.Mojo mojo = new AbstractSurefireMojoTest.Mojo();
         mojo.setEnvironmentVariables(singletonMap("JAVA_HOME", "/already/set/path"));
 
-        DefaultJavaToolChain toolchain = mock(DefaultJavaToolChain.class);
+        JavaToolchain toolchain = mock(JavaToolchain.class);
         when(toolchain.findTool("java")).thenReturn("/path/from/toolchain");
         when(toolchain.getJavaHome()).thenReturn("/some/path");
         mojo.setToolchain(toolchain);
@@ -205,7 +206,7 @@ public class AbstractSurefireMojoToolchainsTest {
         mojo.setLogger(mock(Logger.class));
         mojo.setJvm(System.getProperty("user.dir"));
 
-        MojoFailureException ex = assertThrows(MojoFailureException.class, () -> invokeMethod(mojo, "getEffectiveJvm"));
+        MojoException ex = assertThrows(MojoException.class, () -> invokeMethod(mojo, "getEffectiveJvm"));
         assertThat(ex.getMessage()).startsWith("Given path does not end with java executor");
     }
 
@@ -246,12 +247,17 @@ public class AbstractSurefireMojoToolchainsTest {
         }
 
         @Override
-        public Toolchain getToolchainFromBuildContext(String type, MavenSession context) {
-            return buildContextToolchain;
+        public Optional<Toolchain> getToolchainFromBuildContext(Session session, String type) {
+            return Optional.ofNullable(buildContextToolchain);
         }
 
         @Override
-        public List<Toolchain> getToolchains(MavenSession session, String type, Map<String, String> requirements) {
+        public void storeToolchainToBuildContext(Session session, Toolchain toolchain) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Toolchain> getToolchains(Session session, String type, Map<String, String> requirements) {
             return specToolchain == null ? Collections.<Toolchain>emptyList() : singletonList(specToolchain);
         }
     }
