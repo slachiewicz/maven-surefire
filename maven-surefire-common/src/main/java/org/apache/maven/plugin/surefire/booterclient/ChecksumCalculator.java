@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.maven.artifact.Artifact;
+import org.apache.maven.api.Artifact;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -88,7 +88,7 @@ public class ChecksumCalculator {
     }
 
     public void add(Artifact artifact) {
-        appendObject(artifact != null ? artifact.getId() : null);
+        appendObject(artifact != null ? artifact.key() : null);
     }
 
     public void add(Boolean aBoolean) {

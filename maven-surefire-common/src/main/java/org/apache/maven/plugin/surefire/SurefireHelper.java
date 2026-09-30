@@ -27,14 +27,10 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.maven.execution.MavenExecutionRequest;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugin.surefire.log.PluginConsoleLogger;
 import org.apache.maven.surefire.api.cli.CommandLineOption;
 import org.apache.maven.surefire.api.suite.RunResult;
-import org.apache.maven.surefire.api.testset.TestSetFailedException;
 import org.apache.maven.surefire.booter.SurefireBooterForkException;
 
 import static java.util.Collections.unmodifiableList;
@@ -136,12 +132,12 @@ public final class SurefireHelper {
             RunResult result,
             PluginConsoleLogger log,
             Exception firstForkException)
-            throws MojoFailureException, MojoExecutionException {
+            throws MojoException {
         boolean isError = firstForkException != null || result.isTimeout() || !result.isErrorFree();
         boolean isTooFlaky = isTooFlaky(result, reportParameters);
         if (!isError && !isTooFlaky) {
             if (result.getCompletedCount() == 0 && failIfNoTests(reportParameters)) {
-                throw new MojoFailureException(
+                throw new MojoException(
                         "No tests were executed!  " + "(Set -DfailIfNoTests=false to ignore this error.)");
             }
             return;
@@ -151,7 +147,7 @@ public final class SurefireHelper {
             String errorMessage = createErrorMessage(reportParameters, result, firstForkException);
 
             if (firstForkException instanceof SurefireBooterForkException) {
-                throw new MojoExecutionException(errorMessage, firstForkException);
+                throw new MojoException(errorMessage, firstForkException);
             }
 
             log.error(errorMessage);
@@ -160,7 +156,12 @@ public final class SurefireHelper {
         }
     }
 
-    public static List<CommandLineOption> commandLineOptions(MavenSession session, PluginConsoleLogger log) {
+    /**
+     * The Maven 4 API does not expose the {@code MavenExecutionRequest}: the {@code -e} flag and the reactor failure
+     * behavior ({@code -ff}, {@code -fae}, {@code -fn}) are not available, therefore only the logging level is
+     * reported.
+     */
+    public static List<CommandLineOption> commandLineOptions(PluginConsoleLogger log) {
         List<CommandLineOption> cli = new ArrayList<>();
         if (log.isErrorEnabled()) {
             cli.add(LOGGING_LEVEL_ERROR);
@@ -176,21 +177,6 @@ public final class SurefireHelper {
 
         if (log.isDebugEnabled()) {
             cli.add(LOGGING_LEVEL_DEBUG);
-        }
-
-        MavenExecutionRequest request = session.getRequest();
-
-        if (request.isShowErrors()) {
-            cli.add(SHOW_ERRORS);
-        }
-
-        String failureBehavior = request.getReactorFailureBehavior();
-        if (failureBehavior != null) {
-            try {
-                cli.add(CommandLineOption.valueOf(failureBehavior));
-            } catch (IllegalArgumentException e) {
-                // CommandLineOption does not have specified enum as string. See getRequest() method in Maven Session.
-            }
         }
 
         return unmodifiableList(cli);
@@ -232,20 +218,11 @@ public final class SurefireHelper {
         return reportParameters.getFailIfNoTests();
     }
 
-    private static boolean isFatal(Exception firstForkException) {
-        return firstForkException != null && !(firstForkException instanceof TestSetFailedException);
-    }
-
     private static void throwException(
             SurefireReportParameters reportParameters, RunResult result, Exception firstForkException)
-            throws MojoFailureException, MojoExecutionException {
-        if (isFatal(firstForkException) || result.isInternalError()) {
-            throw new MojoExecutionException(
-                    createErrorMessage(reportParameters, result, firstForkException), firstForkException);
-        } else {
-            throw new MojoFailureException(
-                    createErrorMessage(reportParameters, result, firstForkException), firstForkException);
-        }
+            throws MojoException {
+        // the Maven 4 API has a single MojoException: no distinction between a failure and an execution error
+        throw new MojoException(createErrorMessage(reportParameters, result, firstForkException), firstForkException);
     }
 
     private static String createErrorMessage(

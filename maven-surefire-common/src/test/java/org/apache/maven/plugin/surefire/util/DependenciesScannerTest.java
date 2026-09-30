@@ -30,10 +30,9 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.DefaultArtifact;
-import org.apache.maven.artifact.handler.DefaultArtifactHandler;
-import org.apache.maven.artifact.versioning.VersionRange;
+import org.apache.maven.api.DependencyScope;
+import org.apache.maven.api.DownloadedDependency;
+import org.apache.maven.plugin.surefire.StubDependency;
 import org.apache.maven.surefire.api.testset.TestListResolver;
 import org.apache.maven.surefire.api.util.ScanResult;
 import org.junit.jupiter.api.Test;
@@ -57,15 +56,9 @@ public class DependenciesScannerTest {
                 writeTestFile("DependenciesScannerTest-tests.jar", "org/test/TestA.class", "org/test/TestB.class");
 
         // use target as people can configure ide to compile in an other place than maven
-        Artifact artifact = new DefaultArtifact(
-                "org.surefire.dependency",
-                "test-jar",
-                VersionRange.createFromVersion("1.0"),
-                "test",
-                "jar",
-                "tests",
-                null);
-        artifact.setFile(testFile);
+        StubDependency artifact = new StubDependency(
+                "org.surefire.dependency", "test-jar", "1.0", "jar", DependencyScope.forId("test"), "tests");
+        artifact.setPath(testFile.toPath());
 
         List<String> scanDependencies = new ArrayList<>();
         scanDependencies.add("org.surefire.dependency:test-jar");
@@ -95,15 +88,14 @@ public class DependenciesScannerTest {
         File testJarFile = writeTestFile(
                 "DependenciesScannerTest2-1.0-tests-jdk15.jar", "org/test/TestA.class",
                 "org/test/other/TestAA.class", "org/test/TestB.class");
-        Artifact testArtifact = new DefaultArtifact(
+        StubDependency testArtifact = new StubDependency(
                 "org.surefire.dependency",
                 "dependent-artifact2",
-                VersionRange.createFromVersion("1.0"),
-                "test",
+                "1.0",
                 "jar",
-                "tests-jdk15",
-                null);
-        testArtifact.setFile(testJarFile);
+                DependencyScope.forId("test"),
+                "tests-jdk15");
+        testArtifact.setPath(testJarFile.toPath());
 
         List<String> scanDependencies = new ArrayList<>();
         scanDependencies.add("org.surefire.dependency:dependent-artifact2:*:tests-jdk15:*");
@@ -132,27 +124,15 @@ public class DependenciesScannerTest {
     public void testLocateTestClassesFromMultipleArtifactsWithType() throws Exception {
         File jarFile =
                 writeTestFile("DependenciesScannerTest3-1.0.jar", "org/test/ClassA.class", "org/test/ClassB.class");
-        Artifact mainArtifact = new DefaultArtifact(
-                "org.surefire.dependency",
-                "dependent-artifact3",
-                VersionRange.createFromVersion("1.0"),
-                "test",
-                "jar",
-                null,
-                new DefaultArtifactHandler());
-        mainArtifact.setFile(jarFile);
+        StubDependency mainArtifact = new StubDependency(
+                "org.surefire.dependency", "dependent-artifact3", "1.0", "jar", DependencyScope.forId("test"));
+        mainArtifact.setPath(jarFile.toPath());
 
         File testJarFile =
                 writeTestFile("DependenciesScannerTest3-1.0-tests.jar", "org/test/TestA.class", "org/test/TestB.class");
-        Artifact testArtifact = new DefaultArtifact(
-                "org.surefire.dependency",
-                "dependent-artifact3",
-                VersionRange.createFromVersion("1.0"),
-                "test",
-                "test-jar",
-                null,
-                new DefaultArtifactHandler());
-        testArtifact.setFile(testJarFile);
+        StubDependency testArtifact = new StubDependency(
+                "org.surefire.dependency", "dependent-artifact3", "1.0", "test-jar", DependencyScope.forId("test"));
+        testArtifact.setPath(testJarFile.toPath());
 
         List<String> scanDependencies = new ArrayList<>();
         scanDependencies.add("org.surefire.dependency:dependent-artifact3:test-jar");
@@ -161,7 +141,7 @@ public class DependenciesScannerTest {
         include.add("**/*A.java");
         List<String> exclude = new ArrayList<>();
 
-        List<Artifact> artifacts = Arrays.asList(mainArtifact, testArtifact);
+        List<DownloadedDependency> artifacts = Arrays.asList(mainArtifact, testArtifact);
 
         List<File> filesToScan = filterArtifactsAsFiles(scanDependencies, artifacts);
 
@@ -184,27 +164,15 @@ public class DependenciesScannerTest {
     public void testLocateTestClassesFromMultipleVersionsOfArtifact() throws Exception {
         File jarFile10 =
                 writeTestFile("DependenciesScannerTest4-1.0.jar", "org/test/ClassA.class", "org/test/ClassB.class");
-        Artifact artifact10 = new DefaultArtifact(
-                "org.surefire.dependency",
-                "dependent-artifact4",
-                VersionRange.createFromVersion("1.0"),
-                "test",
-                "jar",
-                null,
-                new DefaultArtifactHandler());
-        artifact10.setFile(jarFile10);
+        StubDependency artifact10 = new StubDependency(
+                "org.surefire.dependency", "dependent-artifact4", "1.0", "jar", DependencyScope.forId("test"));
+        artifact10.setPath(jarFile10.toPath());
 
         File jarFile20 =
                 writeTestFile("DependenciesScannerTest4-2.0.jar", "org/test2/ClassA.class", "org/test2/ClassB.class");
-        Artifact artifact20 = new DefaultArtifact(
-                "org.surefire.dependency",
-                "dependent-artifact4",
-                VersionRange.createFromVersion("2.0"),
-                "test",
-                "jar",
-                null,
-                new DefaultArtifactHandler());
-        artifact20.setFile(jarFile20);
+        StubDependency artifact20 = new StubDependency(
+                "org.surefire.dependency", "dependent-artifact4", "2.0", "jar", DependencyScope.forId("test"));
+        artifact20.setPath(jarFile20.toPath());
 
         List<String> scanDependencies = new ArrayList<>();
         scanDependencies.add("org.surefire.dependency:dependent-artifact4:*:2.0");
@@ -213,7 +181,7 @@ public class DependenciesScannerTest {
         include.add("**/*A.java");
         List<String> exclude = new ArrayList<>();
 
-        List<Artifact> artifacts = Arrays.asList(artifact10, artifact20);
+        List<DownloadedDependency> artifacts = Arrays.asList(artifact10, artifact20);
 
         List<File> filesToScan = filterArtifactsAsFiles(scanDependencies, artifacts);
         DependencyScanner scanner = new DependencyScanner(filesToScan, new TestListResolver(include, exclude));
@@ -229,10 +197,11 @@ public class DependenciesScannerTest {
         assertFalse(props.values().contains("org.test.ClassA"));
     }
 
-    private static List<File> filterArtifactsAsFiles(List<String> scanDependencies, List<Artifact> artifacts) {
+    private static List<File> filterArtifactsAsFiles(
+            List<String> scanDependencies, List<DownloadedDependency> artifacts) {
         List<File> filesToScan = new ArrayList<>();
-        for (Artifact a : DependencyScanner.filter(artifacts, scanDependencies)) {
-            filesToScan.add(a.getFile());
+        for (DownloadedDependency a : DependencyScanner.filter(artifacts, scanDependencies)) {
+            filesToScan.add(a.getPath().toFile());
         }
         return filesToScan;
     }

@@ -22,8 +22,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.api.plugin.MojoException;
 import org.apache.maven.plugin.surefire.AbstractSurefireMojoTest.Mojo;
 import org.apache.maven.plugin.surefire.log.PluginConsoleLogger;
 import org.apache.maven.surefire.api.suite.RunResult;
@@ -139,8 +138,8 @@ public class SurefireHelperTest {
         plugin.setTestFailureIgnore(true);
 
         SurefireBooterForkException exc = new SurefireBooterForkException("Unrecognized option: -Xxxx");
-        MojoExecutionException ex = assertThrows(
-                MojoExecutionException.class,
+        MojoException ex = assertThrows(
+                MojoException.class,
                 () -> reportExecution(plugin, summary, new PluginConsoleLogger(mock(Logger.class)), exc));
         assertThat(ex.getMessage()).contains("Unrecognized option: -Xxxx");
     }
@@ -150,8 +149,7 @@ public class SurefireHelperTest {
         RunResult summary = new RunResult(0, 0, 0, 0);
         Mojo plugin = new Mojo();
         plugin.setFailIfNoTests(true);
-        MojoFailureException ex =
-                assertThrows(MojoFailureException.class, () -> reportExecution(plugin, summary, null, null));
+        MojoException ex = assertThrows(MojoException.class, () -> reportExecution(plugin, summary, null, null));
         assertThat(ex.getMessage())
                 .contains("No tests were executed!  (Set -DfailIfNoTests=false to ignore this error.)");
     }
@@ -159,8 +157,7 @@ public class SurefireHelperTest {
     @Test
     public void shouldHandleTestFailure() throws Exception {
         RunResult summary = new RunResult(1, 0, 1, 0);
-        MojoFailureException ex =
-                assertThrows(MojoFailureException.class, () -> reportExecution(new Mojo(), summary, null, null));
+        MojoException ex = assertThrows(MojoException.class, () -> reportExecution(new Mojo(), summary, null, null));
         assertThat(ex.getMessage())
                 .contains("There are test failures.")
                 .contains("for the individual test results.")
@@ -172,8 +169,8 @@ public class SurefireHelperTest {
         RunResult summary = new RunResult(1, 0, 0, 0, 1);
         Mojo reportParameters = new Mojo();
         reportParameters.setFailOnFlakeCount(1);
-        MojoFailureException ex =
-                assertThrows(MojoFailureException.class, () -> reportExecution(reportParameters, summary, null, null));
+        MojoException ex =
+                assertThrows(MojoException.class, () -> reportExecution(reportParameters, summary, null, null));
         assertThat(ex.getMessage())
                 .contains("There is 1 flake and failOnFlakeCount is set to 1.")
                 .contains("for the individual test results.")
@@ -185,8 +182,8 @@ public class SurefireHelperTest {
         RunResult summary = new RunResult(1, 0, 1, 0, 2);
         Mojo reportParameters = new Mojo();
         reportParameters.setFailOnFlakeCount(1);
-        MojoFailureException ex =
-                assertThrows(MojoFailureException.class, () -> reportExecution(reportParameters, summary, null, null));
+        MojoException ex =
+                assertThrows(MojoException.class, () -> reportExecution(reportParameters, summary, null, null));
         assertThat(ex.getMessage())
                 .contains("There are test failures.")
                 .contains("There are 2 flakes and failOnFlakeCount is set to 1.")

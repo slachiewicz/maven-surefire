@@ -20,43 +20,35 @@ package org.apache.maven.plugin.surefire;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
 
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.stream.Collectors;
 
-import org.apache.maven.RepositoryUtils;
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
-import org.apache.maven.artifact.versioning.OverConstrainedVersionException;
-import org.apache.maven.artifact.versioning.VersionRange;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Plugin;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.eclipse.aether.RepositorySystem;
-import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.collection.CollectRequest;
-import org.eclipse.aether.graph.DependencyFilter;
-import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.resolution.ArtifactResult;
-import org.eclipse.aether.resolution.DependencyRequest;
-import org.eclipse.aether.resolution.DependencyResolutionException;
-import org.eclipse.aether.resolution.DependencyResult;
-import org.eclipse.aether.util.artifact.JavaScopes;
-import org.eclipse.aether.util.filter.DependencyFilterUtils;
+import org.apache.maven.api.Artifact;
+import org.apache.maven.api.DependencyCoordinates;
+import org.apache.maven.api.DownloadedArtifact;
+import org.apache.maven.api.PathScope;
+import org.apache.maven.api.Plugin;
+import org.apache.maven.api.RemoteRepository;
+import org.apache.maven.api.Session;
+import org.apache.maven.api.VersionRange;
+import org.apache.maven.api.di.Named;
+import org.apache.maven.api.di.Singleton;
+import org.apache.maven.api.model.Dependency;
+import org.apache.maven.api.plugin.MojoException;
+import org.apache.maven.api.services.DependencyCoordinatesFactory;
+import org.apache.maven.api.services.DependencyResolver;
+import org.apache.maven.api.services.DependencyResolverException;
+import org.apache.maven.api.services.DependencyResolverRequest;
+import org.apache.maven.api.services.DependencyResolverResult;
+import org.apache.maven.api.services.VersionParserException;
 
-import static org.apache.maven.artifact.ArtifactUtils.artifactMapByVersionlessId;
-import static org.apache.maven.artifact.versioning.VersionRange.createFromVersionSpec;
+import static java.util.Collections.singletonList;
 
 /**
  * Internal component used by the surefire plugin. Not a public API.
@@ -76,42 +68,39 @@ public class SurefireDependencyResolver {
         "surefire-junit-platform", "surefire-api", "surefire-logger-api", "surefire-shared-utils", "common-java5"
     };
 
-    private final RepositorySystem repositorySystem;
-
-    @Inject
-    SurefireDependencyResolver(RepositorySystem repositorySystem) {
-        this.repositorySystem = repositorySystem;
-    }
-
-    public static boolean isWithinVersionSpec(@Nullable Artifact artifact, @Nonnull String versionSpec) {
+    /**
+     * The version range needs a {@link Session}: the Maven 4 API has no static version parser.
+     */
+    public static boolean isWithinVersionSpec(
+            @Nonnull Session session, @Nullable Artifact artifact, @Nonnull String versionSpec) {
         if (artifact == null) {
             return false;
         }
         try {
-            VersionRange range = createFromVersionSpec(versionSpec);
-            try {
-                return range.containsVersion(artifact.getSelectedVersion());
-            } catch (NullPointerException e) {
-                return range.containsVersion(new DefaultArtifactVersion(artifact.getBaseVersion()));
-            }
-        } catch (InvalidVersionSpecificationException | OverConstrainedVersionException e) {
+            VersionRange range = session.parseVersionRange(versionSpec);
+            return range.contains(artifact.getVersion());
+        } catch (VersionParserException e) {
             throw new RuntimeException("Bug in plugin. Please report with stacktrace");
         }
     }
 
-    Map<String, Artifact> resolvePluginDependencies(
-            RepositorySystemSession session,
+    /**
+     * Resolves the dependencies declared on the plugin in the POM, keeping those which are also part of the resolved
+     * classpath of the plugin.
+     */
+    Map<String, DownloadedArtifact> resolvePluginDependencies(
+            Session session,
             List<RemoteRepository> repositories,
             Plugin plugin,
-            Map<String, Artifact> pluginResolvedDependencies)
-            throws MojoExecutionException {
-        Map<String, Artifact> resolved = new LinkedHashMap<>();
-        Collection<Dependency> pluginDependencies = plugin.getDependencies();
+            Map<String, ? extends Artifact> pluginResolvedDependencies)
+            throws MojoException {
+        Map<String, DownloadedArtifact> resolved = new LinkedHashMap<>();
+        DependencyCoordinatesFactory factory = session.getService(DependencyCoordinatesFactory.class);
 
-        for (Dependency dependency : pluginDependencies) {
-            Set<Artifact> artifacts = resolveDependencies(
-                    session, repositories, RepositoryUtils.toDependency(dependency, session.getArtifactTypeRegistry()));
-            for (Artifact artifact : artifacts) {
+        for (Dependency dependency : plugin.getModel().getDependencies()) {
+            Set<DownloadedArtifact> artifacts =
+                    resolveDependencies(session, repositories, factory.create(session, dependency));
+            for (DownloadedArtifact artifact : artifacts) {
                 String key = artifact.getGroupId() + ":" + artifact.getArtifactId();
                 Artifact resolvedPluginDependency = pluginResolvedDependencies.get(key);
                 if (resolvedPluginDependency != null) {
@@ -122,94 +111,107 @@ public class SurefireDependencyResolver {
         return resolved;
     }
 
-    public Set<Artifact> resolveArtifacts(
-            RepositorySystemSession session, List<RemoteRepository> repositories, Artifact artifact)
-            throws MojoExecutionException {
-        return resolveDependencies(session, repositories, RepositoryUtils.toDependency(artifact, null));
-    }
-
-    public Set<Artifact> resolveDependencies(
-            RepositorySystemSession session, List<RemoteRepository> repositories, Dependency dependency)
-            throws MojoExecutionException {
+    public Set<DownloadedArtifact> resolveArtifacts(
+            Session session, List<RemoteRepository> repositories, Artifact artifact) throws MojoException {
         return resolveDependencies(
-                session, repositories, RepositoryUtils.toDependency(dependency, session.getArtifactTypeRegistry()));
+                session,
+                repositories,
+                session.getService(DependencyCoordinatesFactory.class)
+                        .create(session, session.createArtifactCoordinates(artifact)));
     }
 
-    private Set<Artifact> resolveDependencies(
-            RepositorySystemSession session,
-            List<RemoteRepository> repositories,
-            org.eclipse.aether.graph.Dependency dependency)
-            throws MojoExecutionException {
-
-        List<ArtifactResult> results = resolveDependencies(
-                session, repositories, dependency, DependencyFilterUtils.classpathFilter(JavaScopes.RUNTIME));
-        return results.stream()
-                .map(ArtifactResult::getArtifact)
-                .map(RepositoryUtils::toArtifact)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+    public Set<DownloadedArtifact> resolveDependencies(
+            Session session, List<RemoteRepository> repositories, Dependency dependency) throws MojoException {
+        return resolveDependencies(
+                session,
+                repositories,
+                session.getService(DependencyCoordinatesFactory.class).create(session, dependency));
     }
 
-    private List<ArtifactResult> resolveDependencies(
-            RepositorySystemSession session,
-            List<RemoteRepository> repositories,
-            org.eclipse.aether.graph.Dependency dependency,
-            DependencyFilter dependencyFilter)
-            throws MojoExecutionException {
-
+    private Set<DownloadedArtifact> resolveDependencies(
+            Session session, List<RemoteRepository> repositories, DependencyCoordinates dependency)
+            throws MojoException {
         try {
-            // use a collect request without a root in order to not resolve optional dependencies
-            CollectRequest collectRequest =
-                    new CollectRequest(Collections.singletonList(dependency), null, repositories);
-
-            DependencyRequest request = new DependencyRequest();
-            request.setCollectRequest(collectRequest);
-            request.setFilter(dependencyFilter);
-
-            DependencyResult dependencyResult = repositorySystem.resolveDependencies(session, request);
-            return dependencyResult.getArtifactResults();
-        } catch (DependencyResolutionException e) {
-            throw new MojoExecutionException(e.getMessage(), e);
+            // a request without a root, in order to not resolve optional dependencies
+            DependencyResolverRequest request = DependencyResolverRequest.builder()
+                    .session(session)
+                    .requestType(DependencyResolverRequest.RequestType.RESOLVE)
+                    .dependencies(singletonList(dependency))
+                    .pathScope(PathScope.MAIN_RUNTIME)
+                    .repositories(repositories)
+                    .build();
+            DependencyResolverResult result =
+                    session.getService(DependencyResolver.class).resolve(request);
+            return toResolved(result.getDependencies());
+        } catch (DependencyResolverException e) {
+            throw new MojoException(e.getMessage(), e);
         }
     }
 
+    /**
+     * The resolved dependencies in resolution order.
+     */
+    static Set<DownloadedArtifact> toResolved(Map<org.apache.maven.api.Dependency, java.nio.file.Path> dependencies) {
+        Set<DownloadedArtifact> result = new LinkedHashSet<>();
+        for (Entry<org.apache.maven.api.Dependency, java.nio.file.Path> entry : dependencies.entrySet()) {
+            result.add(new ResolvedDependency(entry.getKey(), entry.getValue()));
+        }
+        return result;
+    }
+
     @Nonnull
-    Set<Artifact> getProviderClasspath(
-            RepositorySystemSession session,
-            List<RemoteRepository> repositories,
-            String providerArtifactId,
-            String providerVersion)
-            throws MojoExecutionException {
+    Set<DownloadedArtifact> getProviderClasspath(
+            Session session, List<RemoteRepository> repositories, String providerArtifactId, String providerVersion)
+            throws MojoException {
 
         Dependency provider = toProviderDependency(providerArtifactId, providerVersion);
 
-        org.eclipse.aether.graph.Dependency dependency =
-                RepositoryUtils.toDependency(provider, session.getArtifactTypeRegistry());
-
-        Set<Artifact> result = resolveDependencies(session, repositories, dependency);
+        Set<DownloadedArtifact> result = resolveDependencies(session, repositories, provider);
 
         return orderProviderArtifacts(result);
     }
 
     @Nonnull
-    Map<String, Artifact> getProviderClasspathAsMap(
-            RepositorySystemSession session,
-            List<RemoteRepository> repositories,
-            String providerArtifactId,
-            String providerVersion)
-            throws MojoExecutionException {
+    Map<String, DownloadedArtifact> getProviderClasspathAsMap(
+            Session session, List<RemoteRepository> repositories, String providerArtifactId, String providerVersion)
+            throws MojoException {
         return artifactMapByVersionlessId(
                 getProviderClasspath(session, repositories, providerArtifactId, providerVersion));
+    }
+
+    /**
+     * Replaces {@code Artifact#getDependencyConflictId()}: {@code groupId:artifactId:type[:classifier]}.
+     */
+    static String dependencyConflictId(Artifact artifact) {
+        String type = artifact instanceof org.apache.maven.api.Dependency
+                ? ((org.apache.maven.api.Dependency) artifact).getType().id()
+                : artifact.getExtension();
+        String classifier = artifact.getClassifier();
+        return artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + type
+                + (classifier == null || classifier.isEmpty() ? "" : ":" + classifier);
+    }
+
+    /**
+     * Replaces {@code org.apache.maven.artifact.ArtifactUtils#artifactMapByVersionlessId}, which has no
+     * counterpart in the Maven 4 API. The key is {@code groupId:artifactId}.
+     */
+    static <T extends Artifact> Map<String, T> artifactMapByVersionlessId(Collection<T> artifacts) {
+        Map<String, T> map = new LinkedHashMap<>();
+        for (T artifact : artifacts) {
+            map.put(artifact.getGroupId() + ":" + artifact.getArtifactId(), artifact);
+        }
+        return map;
     }
 
     // FIXME
     // method argument should be unchanged
     // what if providerArtifacts will be unmodifiable
-    private static Set<Artifact> orderProviderArtifacts(Set<Artifact> providerArtifacts) {
-        Set<Artifact> orderedProviderArtifacts = new LinkedHashSet<>();
+    private static Set<DownloadedArtifact> orderProviderArtifacts(Set<DownloadedArtifact> providerArtifacts) {
+        Set<DownloadedArtifact> orderedProviderArtifacts = new LinkedHashSet<>();
         for (String order : PROVIDER_CLASSPATH_ORDER) {
-            Iterator<Artifact> providerArtifactsIt = providerArtifacts.iterator();
+            java.util.Iterator<DownloadedArtifact> providerArtifactsIt = providerArtifacts.iterator();
             while (providerArtifactsIt.hasNext()) {
-                Artifact providerArtifact = providerArtifactsIt.next();
+                DownloadedArtifact providerArtifact = providerArtifactsIt.next();
                 if (providerArtifact.getArtifactId().equals(order)) {
                     orderedProviderArtifacts.add(providerArtifact);
                     providerArtifactsIt.remove();
@@ -221,11 +223,11 @@ public class SurefireDependencyResolver {
     }
 
     private static Dependency toProviderDependency(String providerArtifactId, String providerVersion) {
-        Dependency dependency = new Dependency();
-        dependency.setGroupId(PROVIDER_GROUP_ID);
-        dependency.setArtifactId(providerArtifactId);
-        dependency.setVersion(providerVersion);
-        dependency.setType("jar");
-        return dependency;
+        return Dependency.newBuilder()
+                .groupId(PROVIDER_GROUP_ID)
+                .artifactId(providerArtifactId)
+                .version(providerVersion)
+                .type("jar")
+                .build();
     }
 }
